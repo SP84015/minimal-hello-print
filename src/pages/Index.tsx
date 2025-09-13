@@ -35,10 +35,12 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let channel: any;
+
     const fetchWebsite = async () => {
       try {
         const { data } = await supabase
-          .from("websites_public")
+          .from("websites")
           .select("*")
           .eq("is_active", true)
           .single();
@@ -79,6 +81,17 @@ const Index = () => {
     };
 
     fetchWebsite();
+
+    channel = supabase
+      .channel('public:websites')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'websites' }, () => {
+        fetchWebsite();
+      })
+      .subscribe();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, []);
 
   if (loading) {

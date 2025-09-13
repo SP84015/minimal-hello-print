@@ -20,10 +20,11 @@ export const Gallery = () => {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
 
   useEffect(() => {
+    let channel: any;
     const fetchGallery = async () => {
       try {
         const { data: website } = await supabase
-          .from("websites_public")
+          .from("websites")
           .select("id")
           .eq("is_active", true)
           .maybeSingle();
@@ -36,6 +37,15 @@ export const Gallery = () => {
             .order("order_index");
 
           setImages(galleryData || []);
+
+          if (!channel) {
+            channel = supabase
+              .channel('public:website_gallery')
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'website_gallery', filter: `website_id=eq.${website.id}` }, () => {
+                fetchGallery();
+              })
+              .subscribe();
+          }
         }
       } catch (error) {
         console.error("Error fetching gallery:", error);
@@ -45,6 +55,10 @@ export const Gallery = () => {
     };
 
     fetchGallery();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, []);
 
   const nextImage = () => {

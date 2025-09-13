@@ -28,10 +28,12 @@ export const Services = () => {
     str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
   useEffect(() => {
+    let channel: any;
+
     const fetchServices = async () => {
       try {
         const { data: website } = await supabase
-          .from("websites_public")
+          .from("websites")
           .select("id")
           .eq("is_active", true)
           .maybeSingle();
@@ -44,6 +46,15 @@ export const Services = () => {
             .order("created_at");
 
           setServices(servicesData || []);
+
+          if (!channel) {
+            channel = supabase
+              .channel('public:website_services')
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'website_services', filter: `website_id=eq.${website.id}` }, () => {
+                fetchServices();
+              })
+              .subscribe();
+          }
         }
       } catch (error) {
         console.error("Error fetching services:", error);
@@ -53,6 +64,10 @@ export const Services = () => {
     };
 
     fetchServices();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, []);
 
   if (loading) {
